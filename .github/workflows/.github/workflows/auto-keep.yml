@@ -1,17 +1,48 @@
-name: 仓库自动保活｜防止定时Workflow禁用
+name: Repository Keepalive
+
+# 触发规则：1.定时每月1号自动跑  2.页面手动触发
 on:
-  schedule:
-    - cron: '0 2 1 * *'
   workflow_dispatch:
+  schedule:
+    # UTC时区 cron 0 0 1 * * = 北京时间每月1号早8点执行
+    - cron: '0 0 1 * *'
+
+# 关键权限配置：必须读写权限才能提交文件
 permissions:
   contents: write
+
 jobs:
-  keep_alive_task:
+  keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出仓库代码
+      # 拉取仓库代码
+      - name: Checkout repository
         uses: actions/checkout@v4
-      - name: 自动生成续命提交
-        uses: gautamkrishnar/keepalive-workflow@v2
+
+      # 使用Node22，解决Node20过期警告
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          time_elapsed: 45
+          node-version: 22
+
+      # 创建/更新保活记录文件，写入当前时间戳
+      - name: Update keepalive timestamp
+        run: |
+          echo "Keepalive run at $(date)" > .keepalive-record.txt
+
+      # 配置git提交者信息
+      - name: Git config
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+
+      # 检测文件变更，有改动则提交推送
+      - name: Commit & Push
+        run: |
+          git add .keepalive-record.txt
+          if git diff --quiet --cached; then
+            echo "No changes to commit"
+          else
+            git commit -m "Auto keepalive update"
+            git push
+          fi
