@@ -1,10 +1,9 @@
 name: Repository Keepalive
-
 # 触发规则：1.定时每月1号自动跑  2.页面手动触发
 on:
   workflow_dispatch:
   schedule:
-    # UTC时区 cron 0 0 1 * * = 北京时间每月1号早8点执行
+    # UTC时区 cron 0 0 1 * * = 北京时间每月1日早上8点执行
     - cron: '0 0 1 * *'
 
 # 关键权限配置：必须读写权限才能提交文件
@@ -19,29 +18,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 使用Node22，解决Node20过期警告
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      # 更新保活时间戳文件
+      - name: 更新保活时间戳
+        run: echo "Keepalive run at $(date)" > .keepalive-record.txt
 
-      # 创建/更新保活记录文件，写入当前时间戳
-      - name: Update keepalive timestamp
-        run: |
-          echo "Keepalive run at $(date)" > .keepalive-record.txt
-
-      # 配置git提交者信息
-      - name: Git config
+      # 配置Git提交账号
+      - name: Git 配置提交人
         run: |
           git config --global user.name "${{ github.actor }}"
           git config --global user.email "${{ github.actor }}@users.noreply.github.com"
 
-      # 检测文件变更，有改动则提交推送
-      - name: Commit & Push
+      # 检测变更并提交推送
+      - name: 提交推送更新
         run: |
           git add .keepalive-record.txt
           if git diff --quiet --cached; then
-            echo "No changes to commit"
+            echo "无变更，跳过提交"
           else
             git commit -m "Auto keepalive update"
             git push
